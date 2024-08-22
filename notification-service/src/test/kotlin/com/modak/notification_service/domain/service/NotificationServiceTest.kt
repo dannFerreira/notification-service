@@ -3,6 +3,9 @@ package com.modak.notification_service.domain.service
 import com.modak.notification_service.domain.entity.Notification
 import com.modak.notification_service.domain.entity.enum.NotificationType
 import com.modak.notification_service.domain.gateway.NotificationGateway
+import com.modak.notification_service.domain.notificationregistry.NewsNotificationValidator
+import com.modak.notification_service.domain.notificationregistry.NotificationValidatorRegistry
+import com.modak.notification_service.domain.notificationregistry.UpdateNotificationValidator
 import com.modak.notification_service.domain.repository.NotificationRepository
 import com.modak.notification_service.domain.service.exception.NotificationLimitExceededException
 import io.mockk.*
@@ -14,8 +17,9 @@ class NotificationServiceTest {
 
     private val repository: NotificationRepository = mockk()
     private val gateway: NotificationGateway = mockk()
+    private val registry: NotificationValidatorRegistry = mockk()
 
-    private val service = NotificationService(repository, gateway)
+    private val service = NotificationService(repository, gateway, registry)
 
     @Test
     fun `given a Notification, when type is UPDATE and limit has not exceeded, should send successfully`() {
@@ -34,6 +38,7 @@ class NotificationServiceTest {
         every {
             repository.findByUserIdAndType(notification.userId, notification.type)
         } returns listOf(notification, otherNotification)
+        every { registry.getValidator(notification.type) } returns UpdateNotificationValidator()
         every { gateway.send(notification) } returns true
         every { repository.save(notification) } returns notification
 
@@ -56,6 +61,7 @@ class NotificationServiceTest {
         every {
             repository.findByUserIdAndType(notification.userId, notification.type)
         } returns listOf(notification, notification)
+        every { registry.getValidator(notification.type) } returns UpdateNotificationValidator()
 
         assertThrows<NotificationLimitExceededException> {
             service.send(notification)
@@ -74,6 +80,7 @@ class NotificationServiceTest {
         every {
             repository.findByUserIdAndType(notification.userId, notification.type)
         } returns listOf(notification)
+        every { registry.getValidator(notification.type) } returns NewsNotificationValidator()
         every { gateway.send(notification) } returns true
         every { repository.save(notification) } returns notification
 
@@ -96,6 +103,7 @@ class NotificationServiceTest {
         every {
             repository.findByUserIdAndType(notification.userId, notification.type)
         } returns listOf(notification)
+        every { registry.getValidator(notification.type) } returns NewsNotificationValidator()
 
         assertThrows<NotificationLimitExceededException> {
             service.send(notification)
